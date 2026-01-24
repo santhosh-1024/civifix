@@ -1,0 +1,48 @@
+name: civicfix
+description: Smart City Public Works Feedback App
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase
+  firebase_core: ^3.15.2
+  firebase_auth: ^5.7.0
+  cloud_firestore: ^5.6.12
+  firebase_storage: ^12.4.10
+
+  # Image + File Picker
+  image_picker: ^1.1.2
+  file_picker: ^8.0.0
+
+  # Network
+  http: ^1.2.1
+
+  # State
+  provider: ^6.1.2
+
+  # Location + Maps
+  geolocator: ^13.0.4
+  geocoding: ^3.0.0
+  google_maps_flutter: ^2.9.0
+
+  # Utils
+  intl: ^0.19.0
+  uuid: ^4.5.1
+
+  # UI
+  flutter_svg: ^2.0.10
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
