@@ -1,61 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../models/app_user.dart';
-import '../services/auth_service.dart';
-
-class AuthProvider extends ChangeNotifier {
-  final AuthService _authService = AuthService();
+class AppAuthProvider extends ChangeNotifier {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   User? firebaseUser;
-  AppUser? profile;
-
+  Map<String, dynamic>? profile;
   bool loading = true;
 
-  AuthProvider() {
-    _authService.authChanges().listen((user) async {
-      firebaseUser = user;
+  // ✅ Renamed Constructor
+  AppAuthProvider() {
+    _auth.authStateChanges().listen(_onAuthStateChanged);
+  }
 
-      if (user != null) {
-        profile = await _authService.getProfile(user.uid);
-      } else {
-        profile = null;
-      }
+  Future<void> _onAuthStateChanged(User? user) async {
+    firebaseUser = user;
 
+    if (user == null) {
+      profile = null;
       loading = false;
       notifyListeners();
-    });
+      return;
+    }
+
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection("users")
+          .doc(user.uid)
+          .get();
+
+      profile = snap.data();
+    } catch (e) {
+      debugPrint("Error fetching user profile: $e");
+      profile = null;
+    }
+
+    loading = false;
+    notifyListeners();
   }
 
-  Future<void> registerEmail(String email, String password, String name) async {
-    await _authService.registerEmail(email, password, name);
-  }
-
+  // 🔐 LOGIN
   Future<void> loginEmail(String email, String password) async {
-    await _authService.loginEmail(email, password);
-  }
-
-  Future<void> logout() async {
-    await _authService.logout();
-  }
-
-  // Phone Auth
-  Future<void> sendOtp({
-    required String phone,
-    required Function(String verificationId) onCodeSent,
-    required Function(String message) onError,
-  }) async {
-    await _authService.sendOtp(
-      phone: phone,
-      onCodeSent: onCodeSent,
-      onError: onError,
+    // Note: Exceptions are caught by the LoginScreen's try-catch block
+    await _auth.signInWithEmailAndPassword(
+      email: email,
+      password: password,
     );
+    // authStateChanges listener handles the state update automatically
   }
 
-  Future<void> verifyOtp({
-    required String verificationId,
-    required String otp,
-  }) async {
-    await _authService.verifyOtp(verificationId, otp);
+  // 🔓 LOGOUT
+  Future<void> logout() async {
+    await _auth.signOut();
   }
 }

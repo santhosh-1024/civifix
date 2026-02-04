@@ -4,14 +4,13 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'auth/login_screen.dart';
 import 'citizen/citizen_home_screen.dart';
-import 'admin/admin_home_screen.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
+    final auth = context.watch<AppAuthProvider>();
 
     if (auth.loading) {
       return const Scaffold(
@@ -23,11 +22,6 @@ class SplashScreen extends StatelessWidget {
       return const LoginScreen();
     }
 
-    // role based redirect
-    if (auth.profile?.role == "admin") {
-      return AdminHomeScreen();
-    } else {
-      return const CitizenHomeScreen();
-    }
+    return const CitizenHomeScreen();
   }
 }

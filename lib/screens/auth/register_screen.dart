@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../citizen/citizen_home_screen.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -11,6 +10,7 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -20,44 +20,141 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _showConfirmPassword = false;
   String? _error;
 
-Future<void> _register() async {
-  setState(() {
-    _loading = true;
-    _error = null;
-  });
-
-  try {
-    await FirebaseAuth.instance.createUserWithEmailAndPassword(
-      email: _emailController.text.trim(),
-      password: _passwordController.text.trim(),
-    );
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Account created successfully ✅")),
-    );
-
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const CitizenHomeScreen()),
-      (route) => false,
-    );
-  } on FirebaseAuthException catch (e) {
-    setState(() {
-      _error = e.message ?? "Registration failed";
-    });
-  } catch (e) {
-    setState(() {
-      _error = "Something went wrong";
-    });
-  } finally {
-    setState(() {
-      _loading = false;
-    });
+  bool _isValidEmail(String email) {
+    final e = email.trim();
+    return RegExp(r"^[\w\.\-]+@([\w\-]+\.)+[\w]{2,}$").hasMatch(e);
   }
-}
 
+  Future<bool> _isUsernameTaken(String username) async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection("users")
+          .where("username", isEqualTo: username)
+          .limit(1)
+          .get();
+      return snap.docs.isNotEmpty;
+    } catch (e) {
+      print("Error checking username: $e");
+      return false; // Fail safe
+    }
+  }
+
+  Future<void> _register() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      // ✅ FIX: Convert to lowercase to ensure case-insensitive matching
+      final username = _usernameController.text.trim().toLowerCase();
+      final email = _emailController.text.trim().toLowerCase();
+      final password = _passwordController.text.trim();
+      final confirmPassword = _confirmPasswordController.text.trim();
+
+      // ✅ Validations
+      if (username.isEmpty) {
+        setState(() => _error = "Username is not entered");
+        return;
+      }
+
+      if (email.isEmpty) {
+        setState(() => _error = "Email is not entered");
+        return;
+      }
+
+      if (!_isValidEmail(email)) {
+        setState(() => _error = "Create a valid email");
+        return;
+      }
+
+      if (password.isEmpty) {
+        setState(() => _error = "Password is not entered");
+        return;
+      }
+
+      if (confirmPassword.isEmpty) {
+        setState(() => _error = "Confirm password is not entered");
+        return;
+      }
+
+      if (password != confirmPassword) {
+        setState(() => _error = "Passwords do not match");
+        return;
+      }
+
+      // ✅ Check username unique
+      final taken = await _isUsernameTaken(username);
+      if (taken) {
+        setState(() => _error = "Username already exists. Try another one.");
+        return;
+      }
+
+      // ✅ Create Firebase Auth account
+      final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final user = cred.user;
+      if (user == null) {
+        setState(() => _error = "Registration failed");
+        return;
+      }
+
+      // ✅ REPLACED: Save extended user details in Firestore
+      await FirebaseFirestore.instance
+          .collection("users")
+          .doc(user.uid) // ✅ UID AS DOCUMENT ID
+          .set({
+        "uid": user.uid,
+        "email": email,
+        "username": username, // Saved as lowercase
+        "role": "citizen",
+        "points": 0,
+        "badge": "🥉 Bronze Reporter",
+        "createdAt": FieldValue.serverTimestamp(),
+      });
+
+      // ✅ Send verification email
+      await user.sendEmailVerification();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Account created ✅ Verification mail sent 📩"),
+        ),
+      );
+
+      // ✅ Go back to Login screen
+      Navigator.pop(context);
+    } on FirebaseAuthException catch (e) {
+      print("Firebase Auth Error: ${e.code} - ${e.message}");
+      setState(() {
+        if (e.code == "email-already-in-use") {
+          _error = "Email already in use. Try login instead.";
+        } else if (e.code == "invalid-email") {
+          _error = "Create a valid email";
+        } else if (e.code == "weak-password") {
+          _error = "Password is too weak (min 6 characters)";
+        } else {
+          _error = e.message ?? "Registration failed";
+        }
+      });
+    } catch (e) {
+      print("General Register Error: $e");
+      setState(() {
+        _error = "Something went wrong. Check console.";
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,11 +164,7 @@ Future<void> _register() async {
         height: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFF0F172A), // dark navy
-              Color(0xFF1E293B), // slate
-              Color(0xFF0B1220), // deep
-            ],
+            colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF0B1220)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -89,14 +182,15 @@ Future<void> _register() async {
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.12),
-                      ),
+                      border: Border.all(color: Colors.white.withOpacity(0.12)),
                     ),
                     child: const Column(
                       children: [
-                        Icon(Icons.person_add_alt_1,
-                            color: Colors.white, size: 52),
+                        Icon(
+                          Icons.person_add_alt_1,
+                          color: Colors.white,
+                          size: 52,
+                        ),
                         SizedBox(height: 10),
                         Text(
                           "Create Account",
@@ -110,10 +204,7 @@ Future<void> _register() async {
                         SizedBox(height: 6),
                         Text(
                           "Join CivicFix and start reporting issues",
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.white70,
-                          ),
+                          style: TextStyle(fontSize: 13, color: Colors.white70),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -128,9 +219,7 @@ Future<void> _register() async {
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.12),
-                      ),
+                      border: Border.all(color: Colors.white.withOpacity(0.12)),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.35),
@@ -153,12 +242,19 @@ Future<void> _register() async {
                         const SizedBox(height: 6),
                         const Text(
                           "Create your account to continue.",
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.white70,
-                          ),
+                          style: TextStyle(fontSize: 13, color: Colors.white70),
                         ),
                         const SizedBox(height: 18),
+
+                        // ✅ Username
+                        _inputField(
+                          controller: _usernameController,
+                          label: "Username",
+                          hint: "Enter username",
+                          icon: Icons.person_outline,
+                        ),
+
+                        const SizedBox(height: 14),
 
                         // Email
                         _inputField(
@@ -349,7 +445,10 @@ Future<void> _register() async {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFF38BDF8), width: 1.6),
+              borderSide: const BorderSide(
+                color: Color(0xFF38BDF8),
+                width: 1.6,
+              ),
             ),
           ),
         ),
@@ -359,6 +458,7 @@ Future<void> _register() async {
 
   @override
   void dispose() {
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
