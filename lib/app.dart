@@ -13,7 +13,6 @@ class CivicFixApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AppAuthProvider()),
         ChangeNotifierProvider(create: (_) => ComplaintsProvider()),
         ChangeNotifierProvider(create: (_) => AdminProvider()),
       ],

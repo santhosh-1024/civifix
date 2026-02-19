@@ -1,5 +1,3 @@
-import 'package:confetti/confetti.dart';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -17,7 +15,6 @@ class AdminHomeScreen extends StatefulWidget {
 }
 
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
-  late ConfettiController _confettiController;
 
   String selectedFilter = "All";
   String searchText = "";

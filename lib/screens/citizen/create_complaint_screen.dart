@@ -152,7 +152,9 @@ class _CreateComplaintScreenState extends State<CreateComplaintScreen> {
       }
 
       final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
 
       final lat = pos.latitude;

@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import 'auth/login_screen.dart';
-import 'citizen/citizen_home_screen.dart';
+import 'roll/role_gate.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -22,6 +22,6 @@ class SplashScreen extends StatelessWidget {
       return const LoginScreen();
     }
 
-    return const CitizenHomeScreen();
+    return const RoleGate();
   }
 }
